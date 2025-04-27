@@ -1,0 +1,398 @@
+//===== rAthena Script =======================================
+//= Job stone
+//===== Description: =========================================
+//= flexible job change system.
+//===== Additional Comments: =================================
+//= 1.0 First Version
+//============================================================
+
+
+/* SQL table
+CREATE TABLE IF NOT EXISTS `jc_skill`  (
+  `r_id` int NOT NULL,
+  `id` smallint NOT NULL,
+  `lv` tinyint NULL DEFAULT NULL
+  `flag` tinyint NULL DEFAULT NULL
+)ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS `jc_class`  (
+  `r_id` int NOT NULL AUTO_INCREMENT,
+  `r_name` varchar(255) NOT NULL default '',
+  `char_id` int UNSIGNED NOT NULL,
+  `class` smallint UNSIGNED NOT NULL DEFAULT 0,
+  `base_level` smallint UNSIGNED NOT NULL DEFAULT 1,
+  `job_level` smallint UNSIGNED NOT NULL DEFAULT 1,
+  `str` smallint(4) unsigned NOT NULL default '0',
+  `agi` smallint(4) unsigned NOT NULL default '0',
+  `vit` smallint(4) unsigned NOT NULL default '0',
+  `int` smallint(4) unsigned NOT NULL default '0',
+  `dex` smallint(4) unsigned NOT NULL default '0',
+  `luk` smallint(4) unsigned NOT NULL default '0',
+  `pow` smallint(4) unsigned NOT NULL default '0',
+  `sta` smallint(4) unsigned NOT NULL default '0',
+  `wis` smallint(4) unsigned NOT NULL default '0',
+  `spl` smallint(4) unsigned NOT NULL default '0',
+  `con` smallint(4) unsigned NOT NULL default '0',
+  `crt` smallint(4) unsigned NOT NULL default '0',
+  `status_point` int(11) unsigned NOT NULL default '0',
+  `skill_point` int(11) unsigned NOT NULL default '0',
+  `trait_point` int(11) unsigned NOT NULL default '0',
+  PRIMARY KEY (`r_id`),
+  INDEX (`char_id`)
+) ENGINE = MyISAM
+*/
+//@reloadscript
+/*
+@skilllist_id[]   - skill ids.
+@skilllist_lv[]   - skill levels.
+@skilllist_flag[] - see 'skill' for the meaning of skill flags.
+@skilllist_count  - number of skills in the above arrays.
+skill <skillid>,<level>,0;
+*/
+	function	script	Job_change	{
+  .max_Stored_job = 10;
+  .@cid = getcharid(0);
+  getskilllist(.@cid);
+  .@size = query_sql(
+    "SELECT `r_id`,`r_name`,`char_id`, `class`, `base_level`, `job_level`, `str`, `agi`, `vit`, `int`,`dex`, `luk`, `pow`, `sta`, `wis`, `spl`, `con`, `crt`,`status_point`, `skill_point`, `trait_point` FROM `jc_class` WHERE `char_id` = " + .@cid,
+    .@r_id,
+    .@r_name$,
+    .@char_id, 
+    .@class, 
+    .@base_level, 
+    .@job_level,
+    .@str, 
+    .@agi, 
+    .@vit, 
+    .@int, 
+    .@dex, 
+    .@luk, 
+    .@pow, 
+    .@sta, 
+    .@wis, 
+    .@spl, 
+    .@con, 
+    .@crt, 
+    .@status_point, 
+    .@skill_point, 
+    .@trait_point
+    );
+
+  switch (select((.@size <= 0) ? "" : "Change Class",(.max_Stored_job && .@size >= .max_Stored_job) ? "" :"Store Current Class",(.@size <= 0) ? "" : "Change to Novice"))
+   {	
+    case 1:
+      for (.@i = 0; .@i < .@size; .@i++){
+				.@menu$ = .@menu$ + .@r_name$[.@i] + ":";
+      }
+			if (.@size > 1){
+        .@index = select(.@menu$) - 1;
+      }
+			mes "[" + .@r_name$[.@index]+"]";
+      mes "======Job Info====== ";
+      mes "Class: " +jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")";
+	    mes sprintf("Str ^ee964b[%03d]^000000 Agi ^ee964b[%03d]^000000 Vit ^ee964b[%03d]^000000", .@str[.@index], .@agi[.@index], .@vit[.@index]);
+	    mes sprintf("Int ^ee964b[%03d]^000000 Dex ^ee964b[%03d]^000000 Luk ^ee964b[%03d]^000000", .@int[.@index], .@dex[.@index], .@luk[.@index]);
+	    mes sprintf("Pow ^ee964b[%03d]^000000 Sta ^ee964b[%03d]^000000 Wis ^ee964b[%03d]^000000", .@pow[.@index], .@sta[.@index], .@wis[.@index]);
+	    mes sprintf("Spl ^ee964b[%03d]^000000 Con ^ee964b[%03d]^000000 Crt ^ee964b[%03d]^000000", .@spl[.@index], .@con[.@index], .@crt[.@index]);
+      mes "- - - - - - Point - - - - - -";
+      mes sprintf("STAT ^8ac926[%03d]^000000 SKILL^8ac926[%03d]^000000 TRAIT^8ac926[%03d]^000000" ,.@Status_point[.@index] ,.@Skill_point[.@index],.@trait_point[.@index]);
+			if (select("Load", "Cancel") == 2) 
+				break;
+			clear;
+
+      if ( Weight && Weight >= (20000 + (.@str[.@index] * 300))) {
+        mes "Your selected build have insufficient STR to handle your current inventory items ("+F_InsertComma(Weight/10)+"/"+F_InsertComma((20000 + (.@str[.@index] * 300)) / 10)+").";
+        close;
+			}
+
+      .@skill_count = query_sql(
+        "SELECT `id`, `lv`, `flag` FROM `jc_skill` WHERE `r_id` = " + .@r_id[.@index],
+        .@skill_id_list,
+        .@skill_lv_list,
+        .@skill_flag_list);
+
+    
+      resetlvl 1;
+      jobchange .@class[.@index];
+      resetstatus;
+      resetskill;
+		  BaseLevel = .@base_level[.@index];
+		  JobLevel = .@job_level[.@index];
+      StatusPoint = .@status_point[.@index];
+			SkillPoint = .@skill_point[.@index];
+      TraitPoint = .@trait_point[.@index];
+
+      if (readparam(bStr) < .@str[.@index])
+				statusup2 bStr, (.@str[.@index] - 1);
+			if (readparam(bAgi) < .@agi[.@index])
+				statusup2 bAgi, (.@agi[.@index] - 1);
+			if (readparam(bVit) < .@vit[.@index])
+				statusup2 bVit, (.@vit[.@index] - 1);
+			if (readparam(bInt) < .@int[.@index])
+				statusup2 bInt, (.@int[.@index] - 1);
+			if (readparam(bDex) < .@dex[.@index])
+				statusup2 bDex, (.@dex[.@index] - 1);
+			if (readparam(bLuk) < .@luk[.@index])
+				statusup2 bLuk, (.@luk[.@index] - 1);
+			if (readparam(bPow) < .@pow[.@index])
+				statusup2 bPow, .@pow[.@index];
+			if (readparam(bSta) < .@sta[.@index])
+				statusup2 bSta, .@sta[.@index];
+			if (readparam(bWis) < .@wis[.@index])
+				statusup2 bWis, .@wis[.@index];
+			if (readparam(bSpl) < .@spl[.@index])
+				statusup2 bSpl, .@spl[.@index];
+			if (readparam(bCon) < .@con[.@index])
+				statusup2 bCon, .@con[.@index];
+			if (readparam(bCrt) < .@crt[.@index])
+				statusup2 bCrt, .@crt[.@index];
+
+      for( .@i=0; .@i<.@skill_count; .@i++){
+        skill .@skill_id_list[.@i],.@skill_lv_list[.@i],.@skill_flag_list[.@i];
+      }
+      clear;
+      mes "[" + .@r_name$[.@index]+"]";
+      mes "Class loaded successfully";
+      break;
+    case 2:
+      mes "======Job Info====== ";
+      mes "Class: " +jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")";
+	    mes sprintf("Str ^ee964b[%03d]^000000 Agi ^ee964b[%03d]^000000 Vit ^ee964b[%03d]^000000", readparam(bStr), readparam(bAgi), readparam(bVit));
+	    mes sprintf("Int ^ee964b[%03d]^000000 Dex ^ee964b[%03d]^000000 Luk ^ee964b[%03d]^000000", readparam(bInt), readparam(bDex), readparam(bLuk));
+	    mes sprintf("Pow ^ee964b[%03d]^000000 Sta ^ee964b[%03d]^000000 Wis ^ee964b[%03d]^000000", readparam(bPow), readparam(bSta), readparam(bWis));
+	    mes sprintf("Spl ^ee964b[%03d]^000000 Con ^ee964b[%03d]^000000 Crt ^ee964b[%03d]^000000", readparam(bSpl), readparam(bCon), readparam(bCrt));
+      mes "- - - - - - Point - - - - - -";
+      mes sprintf("STAT ^8ac926[%03d]^000000 SKILL^8ac926[%03d]^000000 TRAIT^8ac926[%03d]^000000" ,readparam(StatusPoint) ,readparam(SkillPoint),readparam(TraitPoint));
+      
+      .@exist = query_sql(
+        "SELECT `r_id`, `base_level`, `job_level` FROM `jc_class` WHERE `char_id` = " + .@cid + " AND `class` = " + eaclass(),
+        .@record_idList,
+        .@record_bLevelList,
+        .@record_jLevelList
+        );
+
+      if (select("Confirm", "Cancel") == 2) 
+        break;
+
+      //++++++Inserting the job info++++++
+      //Same class entry exists,Update the entry
+      if(.@exist >0){
+        .@new_bLevel=.@record_bLevelList[0];
+        .@new_jLevel=.@record_jLevelList[0];
+        .@new_record_id=.@record_idList[0];
+        if(BaseLevel<.@new_bLevel || JobLevel<.@new_jLevel){
+          clear;
+          mes "[Warning]";
+          mes "You current level is lower than the record level, are you sure you want to override?";
+          if (select("Confirm", "Cancel") == 2) 
+            break;
+            clear;
+        }
+        .@sql$ = "UPDATE `jc_class` SET " +
+        "`r_name` = '" + jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")" + "', " +
+        "`base_level` = " + BaseLevel + ", " +
+        "`job_level` = " + JobLevel + ", " +
+        "`str` = " + readparam(bStr) + ", " +
+        "`agi` = " + readparam(bAgi) + ", " +
+        "`vit` = " + readparam(bVit) + ", " +
+        "`int` = " + readparam(bInt) + ", " +
+        "`dex` = " + readparam(bDex) + ", " +
+        "`luk` = " + readparam(bLuk) + ", " +
+        "`pow` = " + readparam(bPow) + ", " +
+        "`sta` = " + readparam(bSta) + ", " +
+        "`wis` = " + readparam(bWis) + ", " +
+        "`spl` = " + readparam(bSpl) + ", " +
+        "`con` = " + readparam(bCon) + ", " +
+        "`crt` = " + readparam(bCrt) + ", " +
+        "`status_point` = " + StatusPoint + ", " +
+        "`skill_point` = " + SkillPoint + ", " +
+        "`trait_point` = " + TraitPoint + " " +
+        "WHERE `char_id` = " + .@cid + " AND `class` = " + eaclass();
+        query_sql(.@sql$);
+      }
+      //No class templet exists, inserting
+      else{
+        .@sql$ = "INSERT INTO `jc_class` " +
+        "(`r_name`,`char_id`, `class`, `base_level`, `job_level`, " +
+        "`str`, `agi`, `vit`, `int`, `dex`, `luk`, " +
+        "`pow`, `sta`, `wis`, `spl`, `con`, `crt`, " +
+        "`status_point`, `skill_point`, `trait_point`) " +
+        "VALUES ('" +
+        jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")" + "', " +
+        .@cid + ", " +
+        eaclass() + ", " +
+        BaseLevel + ", " +
+        JobLevel + ", " +
+        readparam(bStr) + ", " +
+        readparam(bAgi) + ", " +
+        readparam(bVit) + ", " +
+        readparam(bInt) + ", " +
+        readparam(bDex) + ", " +
+        readparam(bLuk) + ", " +
+        readparam(bPow) + ", " +
+        readparam(bSta) + ", " +
+        readparam(bWis) + ", " +
+        readparam(bSpl) + ", " +
+        readparam(bCon) + ", " +
+        readparam(bCrt) + ", " +
+        StatusPoint + ", " +
+        SkillPoint + ", " +
+        TraitPoint + 
+        ")";
+        query_sql(.@sql$);
+        query_sql("SELECT LAST_INSERT_ID()", .@new_record_id);
+      }     
+
+      if(.@new_record_id==-1){
+        clear;
+        mes "[Warning]";
+        mes "Something went wrong, plesae check the script ";
+        break;
+      }
+      //++++++Inserting the skill tree info++++++
+      //Same class entry exists,drop old skill info, update new one
+      if(.@exist >0){
+        query_sql("DELETE FROM `jc_skill` WHERE `r_id` = " + .@new_record_id);
+        for( @i = 0; @i<@skilllist_count;@i++ ){
+            .@sqlSkill$= "INSERT INTO `jc_skill` (`r_id`, `id`, `lv`, `flag`) VALUES ("+.@new_record_id+","+@skilllist_id[@i]+", "+@skilllist_lv[@i]+", "+@skilllist_flag[@i]+")";
+            query_sql(.@sqlSkill$);
+        }
+        clear;
+        mes "[Notice]";
+        mes "Class: " +jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")"+" has been updated.";
+        }
+      //No class entry exists,add skill info
+      else{
+        for( @i = 0; @i<@skilllist_count;@i++ ){
+          .@sqlSkill$= "INSERT INTO `jc_skill` (`r_id`, `id`, `lv`, `flag`) VALUES ("+.@new_record_id+","+@skilllist_id[@i]+", "+@skilllist_lv[@i]+", "+@skilllist_flag[@i]+")";
+          query_sql(.@sqlSkill$);
+        }
+        clear;
+        mes "[Notice]";
+        mes "Class: " +jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")"+" has been stored.";
+      }		
+      break;
+
+    case 3:
+      mes "[Change to Novice ]";
+      mes "======Notice====== ";
+      mes "This will turn you back into a 1/1 novice";
+      mes "So that you can choose another job path.";
+      mes "Your current job will be saved automatically";
+      mes "And you will be give a 24 hours EXP bonus to help you grind back the level";
+      mes "[Proceed?]";
+      if (select("Confirm", "Cancel") == 2) 
+        break;
+
+      //Reused code from the store job part, I can't find a way to make function call, so I just have to use the same code twice
+      .@exist = query_sql(
+        "SELECT `r_id`, `base_level`, `job_level` FROM `jc_class` WHERE `char_id` = " + .@cid + " AND `class` = " + eaclass(),
+        .@record_idList,
+        .@record_bLevelList,
+        .@record_jLevelList
+        );      
+            //++++++Inserting the job info++++++
+      //Same class entry exists,Update the entry
+      if(.@exist >0){
+        .@new_bLevel=.@record_bLevelList[0];
+        .@new_jLevel=.@record_jLevelList[0];
+        .@new_record_id=.@record_idList[0];
+        if(BaseLevel<.@new_bLevel || JobLevel<.@new_jLevel){
+          clear;
+          mes "[Warning]";
+          mes "You current level is lower than the record level, are you sure you want to override?";
+          if (select("Confirm", "Cancel") == 2) 
+            break;
+            clear;
+        }
+        .@sql$ = "UPDATE `jc_class` SET " +
+        "`r_name` = '" + jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")" + "', " +
+        "`base_level` = " + BaseLevel + ", " +
+        "`job_level` = " + JobLevel + ", " +
+        "`str` = " + readparam(bStr) + ", " +
+        "`agi` = " + readparam(bAgi) + ", " +
+        "`vit` = " + readparam(bVit) + ", " +
+        "`int` = " + readparam(bInt) + ", " +
+        "`dex` = " + readparam(bDex) + ", " +
+        "`luk` = " + readparam(bLuk) + ", " +
+        "`pow` = " + readparam(bPow) + ", " +
+        "`sta` = " + readparam(bSta) + ", " +
+        "`wis` = " + readparam(bWis) + ", " +
+        "`spl` = " + readparam(bSpl) + ", " +
+        "`con` = " + readparam(bCon) + ", " +
+        "`crt` = " + readparam(bCrt) + ", " +
+        "`status_point` = " + StatusPoint + ", " +
+        "`skill_point` = " + SkillPoint + ", " +
+        "`trait_point` = " + TraitPoint + " " +
+        "WHERE `char_id` = " + .@cid + " AND `class` = " + eaclass();
+        query_sql(.@sql$);
+      }
+      //No class templet exists, inserting
+      else{
+        .@sql$ = "INSERT INTO `jc_class` " +
+        "(`r_name`,`char_id`, `class`, `base_level`, `job_level`, " +
+        "`str`, `agi`, `vit`, `int`, `dex`, `luk`, " +
+        "`pow`, `sta`, `wis`, `spl`, `con`, `crt`, " +
+        "`status_point`, `skill_point`, `trait_point`) " +
+        "VALUES ('" +
+        jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")" + "', " +
+        .@cid + ", " +
+        eaclass() + ", " +
+        BaseLevel + ", " +
+        JobLevel + ", " +
+        readparam(bStr) + ", " +
+        readparam(bAgi) + ", " +
+        readparam(bVit) + ", " +
+        readparam(bInt) + ", " +
+        readparam(bDex) + ", " +
+        readparam(bLuk) + ", " +
+        readparam(bPow) + ", " +
+        readparam(bSta) + ", " +
+        readparam(bWis) + ", " +
+        readparam(bSpl) + ", " +
+        readparam(bCon) + ", " +
+        readparam(bCrt) + ", " +
+        StatusPoint + ", " +
+        SkillPoint + ", " +
+        TraitPoint + 
+        ")";
+        query_sql(.@sql$);
+        query_sql("SELECT LAST_INSERT_ID()", .@new_record_id);
+      }     
+      if(.@new_record_id==-1){
+        clear;
+        mes "[Warning]";
+        mes "Something went wrong, plesae check the script ";
+        break;
+      }
+      //++++++Inserting the skill tree info++++++
+      //Same class entry exists,drop old skill info, update new one
+      if(.@exist >0){
+        query_sql("DELETE FROM `jc_skill` WHERE `r_id` = " + .@new_record_id);
+        for( @i = 0; @i<@skilllist_count;@i++ ){
+            .@sqlSkill$= "INSERT INTO `jc_skill` (`r_id`, `id`, `lv`, `flag`) VALUES ("+.@new_record_id+","+@skilllist_id[@i]+", "+@skilllist_lv[@i]+", "+@skilllist_flag[@i]+")";
+            query_sql(.@sqlSkill$);
+        }
+        clear;
+        mes "[Notice]";
+        mes "Class: " +jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")"+" has been updated.";
+        }
+      //No class entry exists,add skill info
+      else{
+        for( @i = 0; @i<@skilllist_count;@i++ ){
+          .@sqlSkill$= "INSERT INTO `jc_skill` (`r_id`, `id`, `lv`, `flag`) VALUES ("+.@new_record_id+","+@skilllist_id[@i]+", "+@skilllist_lv[@i]+", "+@skilllist_flag[@i]+")";
+          query_sql(.@sqlSkill$);
+        }
+        clear;
+        mes "[Notice]";
+        mes "Class: " +jobname(roclass(eaclass()))+" ("+BaseLevel+"/"+JobLevel+")"+" has been stored.";
+      }		
+      resetlvl 1;
+      jobchange 0;
+      resetstatus;
+      resetskill;
+      //24h, 300% exp bouns
+      sc_start SC_EXPBOOST,86400000,200;
+      break;
+  }
+	end;
+}
